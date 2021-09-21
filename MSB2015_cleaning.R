@@ -177,3 +177,34 @@ DataChange[,-c(1,2)] <- apply(DataChange[,-c(1,2)],2,function(x){
 })
 
 #Exploring relationship
+for (var in colnames(DataChange)[-c(1,2,11)]){
+  plot(DataChange[,var],DataChange$copdDalys,xlab = var,ylab = "COPD Dalys")
+}
+
+#creating shifted data
+dataShifted <- vector(mode = "list",5)
+shifts <- c(1,5,7,10,15)
+for (i in 1:length(shifts)){
+  for (ii in 1:length(countries)){
+    dataTemp <- DataChange[DataChange$country == countries[ii],]
+    predTemp <- dataTemp[-((nrow(dataTemp)-shifts[i]+1):nrow(dataTemp)),-ncol(dataTemp)]
+    critTemp <- dataTemp[-(1:shifts[i]),ncol(dataTemp)]
+    dataTemp <- data.frame(predTemp,critTemp)
+    if (ii == 1){
+      dataTemp2 <- dataTemp
+    }
+    else{
+      dataTemp2 <- rbind(dataTemp2,dataTemp)
+    }
+  }
+  dataShifted[[i]] <- dataTemp2
+  names(dataShifted)[i] <- paste0("YearMinus",shifts[i])
+  colnames(dataShifted[[i]])[11] <- "copdDalys"
+}
+for (var in colnames(dataShifted[[i]])[-c(1,2,11)]){
+  for (i in 1:length(dataShifted)){
+  
+    plot(dataShifted[[i]][,var],dataShifted[[i]]$copdDalys,
+         main = names(dataShifted)[i],xlab = var,ylab = "COPD Dalys")
+  }
+}
