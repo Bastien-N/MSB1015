@@ -152,8 +152,14 @@ naDat <- is.na.data.frame(Data)
 naDat <- rowSums(naDat) == 0
 
 Data <- Data[naDat,]
+pcaDat <- Data[,-c(1,2)]
+pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
+substring <- substr(Data$country,1,2)
+pcaRes <- data.frame(Data[,c(1,2)],pcaDat@scores,substring)
 
-#Transforming data into ratio (year/previous year)
+ggplot(pcaRes,aes(x = PC1,y = PC2,color = year)) +
+  geom_text(aes(label = substring)) 
+#Transforming data into change (year-previous year)
 countries <- unique(Data$country)
 
 for (i in 1:length(countries)){
@@ -171,11 +177,26 @@ for (i in 1:length(countries)){
     DataChange <- rbind(DataChange,dataTemp3)
   }
 }
+pcaDat <- DataChange[,-c(1,2)]
+pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
+substring <- substr(DataChange$country,1,2)
+pcaRes <- data.frame(DataChange,pcaDat@scores,substring)
+
+ggplot(pcaRes,aes(x = PC3,y = PC4,color = copdDalys)) +
+  geom_text(aes(label = substring)) 
+
 #min-max Scaling
 DataChange[,-c(1,2)] <- apply(DataChange[,-c(1,2)],2,function(x){
    (x - min(x))/(max(x)-min(x))
 })
 
+pcaDat <- DataChange[,-c(1,2)]
+pcaDat <- pca(pcaDat,nPcs = 6,scale = "none")
+substring <- substr(DataChange$country,1,2)
+pcaRes <- data.frame(DataChange[,c(1,2)],pcaDat@scores,substring)
+
+ggplot(pcaRes,aes(x = PC1,y = PC2,color = country)) +
+  geom_text(aes(label = substring)) 
 #Exploring relationship
 for (var in colnames(DataChange)[-c(1,2,11)]){
   plot(DataChange[,var],DataChange$copdDalys,xlab = var,ylab = "COPD Dalys")
@@ -183,7 +204,7 @@ for (var in colnames(DataChange)[-c(1,2,11)]){
 
 #creating shifted data
 dataShifted <- vector(mode = "list",5)
-shifts <- c(1,5,7,10,15)
+shifts <- 1:5
 for (i in 1:length(shifts)){
   for (ii in 1:length(countries)){
     dataTemp <- DataChange[DataChange$country == countries[ii],]
@@ -208,3 +229,91 @@ for (var in colnames(dataShifted[[i]])[-c(1,2,11)]){
          main = names(dataShifted)[i],xlab = var,ylab = "COPD Dalys")
   }
 }
+
+##Aggregating years:
+#Per three years
+dataTemp <- dataTemp2 <- dataTemp3 <- DataAggThree<- NULL
+for (i in 1:length(countries)){
+  
+  dataTemp <- DataChange[DataChange$country == countries[i],]
+  years <- unique(dataTemp$year)
+  for (ii in 1:9){
+    yearsTemp <- years[(1+(ii-1)*3):(ii*3)]
+    dataTemp2 <- dataTemp[dataTemp$year %in% yearsTemp,]
+    
+    if (nrow(dataTemp2) == 3){
+
+      dataTemp2 <- data.frame(dataTemp2[1,1],
+                              paste0(substr(yearsTemp[1],1,4),'_to_',substr(yearsTemp[3],1,4)),
+                                     t(colSums(dataTemp2[,-c(1,2)])))
+      colnames(dataTemp2) <- colnames(DataChange)
+      if (ii == 1){
+        dataTemp3 <- dataTemp2
+      }
+      else{
+        dataTemp3 <- rbind(dataTemp3,dataTemp2)
+      }
+    }
+
+  }
+  if (i == 1){DataAggThree <- dataTemp3}
+  else{DataAggThree <- rbind(DataAggThree,dataTemp3)}
+}
+
+#PCA
+pcaDat <- DataAggThree[,-c(1,2)]
+pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
+substring <- substr(DataAggThree$country,1,2)
+pcaRes <- data.frame(DataAggThree,pcaDat@scores,substring)
+
+ggplot(pcaRes,aes(x = PC1,y = PC2,color = copdDalys)) +
+  geom_text(aes(label = substring)) 
+#Exploring relationship
+for (var in colnames(DataAggThree)[-c(1,2,11)]){
+  plot(DataAggThree[,var],DataAggThree$copdDalys,xlab = var,ylab = "COPD Dalys")
+}
+##Aggregating years:
+#Per nine years
+dataTemp <- dataTemp2 <- dataTemp3 <- DataAggNine<- NULL
+for (i in 1:length(countries)){
+  
+  dataTemp <- DataChange[DataChange$country == countries[i],]
+  years <- unique(dataTemp$year)
+  for (ii in 1:3){
+    yearsTemp <- years[(1+(ii-1)*9):(ii*9)]
+    dataTemp2 <- dataTemp[dataTemp$year %in% yearsTemp,]
+    
+    if (nrow(dataTemp2) == 9){
+      
+      dataTemp2 <- data.frame(dataTemp2[1,1],
+                              paste0(substr(yearsTemp[1],1,4),'_to_',substr(yearsTemp[3],1,4)),
+                              t(colSums(dataTemp2[,-c(1,2)])))
+      colnames(dataTemp2) <- colnames(DataChange)
+      if (ii == 1){
+        dataTemp3 <- dataTemp2
+      }
+      else{
+        dataTemp3 <- rbind(dataTemp3,dataTemp2)
+      }
+    }
+    
+  }
+  if (i == 1){DataAggNine <- dataTemp3}
+  else{DataAggNine <- rbind(DataAggNine,dataTemp3)}
+}
+
+#PCA
+pcaDat <- DataAggNine[,-c(1,2)]
+pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
+substring <- substr(DataAggNine$country,1,2)
+pcaRes <- data.frame(DataAggNine,pcaDat@scores,substring)
+
+ggplot(pcaRes,aes(x = PC1,y = PC2,color = copdDalys)) +
+  geom_text(aes(label = substring)) 
+#Exploring relationship
+for (var in colnames(DataAggNine)[-c(1,2,11)]){
+  plot(DataAggNine[,var],DataAggNine$copdDalys,xlab = var,ylab = "COPD Dalys")
+}
+
+
+
