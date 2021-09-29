@@ -187,20 +187,21 @@ ggplot(pcaRes,aes(x = PC3,y = PC4,color = copdDalys)) +
 #Exporting change data
 write.csv(DataChange,"data_change.csv",quote = FALSE)
 #min-max Scaling
-DataChange[,-c(1,2)] <- apply(DataChange[,-c(1,2)],2,function(x){
+DataChangeMinMax <- DataChange
+DataChangeMinMax[,-c(1,2)] <- apply(DataChangeMinMax[,-c(1,2)],2,function(x){
    (x - min(x))/(max(x)-min(x))
 })
 
-pcaDat <- DataChange[,-c(1,2)]
+pcaDat <- DataChangeMinMax[,-c(1,2)]
 pcaDat <- pca(pcaDat,nPcs = 6,scale = "none")
-substring <- substr(DataChange$country,1,2)
-pcaRes <- data.frame(DataChange[,c(1,2)],pcaDat@scores,substring)
+substring <- substr(DataChangeMinMax$country,1,2)
+pcaRes <- data.frame(DataChangeMinMax[,c(1,2)],pcaDat@scores,substring)
 
 ggplot(pcaRes,aes(x = PC1,y = PC2,color = country)) +
   geom_text(aes(label = substring)) 
 #Exploring relationship
-for (var in colnames(DataChange)[-c(1,2,11)]){
-  plot(DataChange[,var],DataChange$copdDalys,xlab = var,ylab = "COPD Dalys")
+for (var in colnames(DataChangeMinMax)[-c(1,2,11)]){
+  plot(DataChangeMinMax[,var],DataChangeMinMax$copdDalys,xlab = var,ylab = "COPD Dalys")
 }
 
 #creating shifted data
@@ -208,7 +209,7 @@ dataShifted <- vector(mode = "list",5)
 shifts <- 1:5
 for (i in 1:length(shifts)){
   for (ii in 1:length(countries)){
-    dataTemp <- DataChange[DataChange$country == countries[ii],]
+    dataTemp <- DataChangeMinMax[DataChangeMinMax$country == countries[ii],]
     predTemp <- dataTemp[-((nrow(dataTemp)-shifts[i]+1):nrow(dataTemp)),-ncol(dataTemp)]
     critTemp <- dataTemp[-(1:shifts[i]),ncol(dataTemp)]
     dataTemp <- data.frame(predTemp,critTemp)
