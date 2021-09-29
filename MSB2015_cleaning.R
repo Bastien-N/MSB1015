@@ -184,7 +184,8 @@ pcaRes <- data.frame(DataChange,pcaDat@scores,substring)
 
 ggplot(pcaRes,aes(x = PC3,y = PC4,color = copdDalys)) +
   geom_text(aes(label = substring)) 
-
+#Exporting change data
+write.csv(DataChange,"data_change.csv",quote = FALSE)
 #min-max Scaling
 DataChange[,-c(1,2)] <- apply(DataChange[,-c(1,2)],2,function(x){
    (x - min(x))/(max(x)-min(x))
