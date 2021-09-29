@@ -157,7 +157,7 @@ pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
 substring <- substr(Data$country,1,2)
 pcaRes <- data.frame(Data[,c(1,2)],pcaDat@scores,substring)
 
-ggplot(pcaRes,aes(x = PC1,y = PC2,color = year)) +
+ggplot(pcaRes,aes(x = PC3,y = PC4,color = year)) +
   geom_text(aes(label = substring)) 
 #Transforming data into change (year-previous year)
 countries <- unique(Data$country)
@@ -182,21 +182,22 @@ pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
 substring <- substr(DataChange$country,1,2)
 pcaRes <- data.frame(DataChange,pcaDat@scores,substring)
 
-ggplot(pcaRes,aes(x = PC3,y = PC4,color = copdDalys)) +
+ggplot(pcaRes,aes(x = PC1,y = PC2,color = copdDalys)) +
   geom_text(aes(label = substring)) 
-
-#min-max Scaling
-DataChange[,-c(1,2)] <- apply(DataChange[,-c(1,2)],2,function(x){
-   (x - min(x))/(max(x)-min(x))
-})
-
-pcaDat <- DataChange[,-c(1,2)]
-pcaDat <- pca(pcaDat,nPcs = 6,scale = "none")
-substring <- substr(DataChange$country,1,2)
-pcaRes <- data.frame(DataChange[,c(1,2)],pcaDat@scores,substring)
-
-ggplot(pcaRes,aes(x = PC1,y = PC2,color = country)) +
-  geom_text(aes(label = substring)) 
+plotPcs(pcaDat)
+# 
+# #min-max Scaling
+# DataChange[,-c(1,2)] <- apply(DataChange[,-c(1,2)],2,function(x){
+#    (x - min(x))/(max(x)-min(x))
+# })
+# 
+# pcaDat <- DataChange[,-c(1,2)]
+# pcaDat <- pca(pcaDat,nPcs = 6,scale = "none")
+# substring <- substr(DataChange$country,1,2)
+# pcaRes <- data.frame(DataChange[,c(1,2)],pcaDat@scores,substring)
+# 
+# ggplot(pcaRes,aes(x = PC1,y = PC2,color = country)) +
+#   geom_text(aes(label = substring)) 
 #Exploring relationship
 for (var in colnames(DataChange)[-c(1,2,11)]){
   plot(DataChange[,var],DataChange$copdDalys,xlab = var,ylab = "COPD Dalys")
