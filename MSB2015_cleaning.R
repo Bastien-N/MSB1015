@@ -6,7 +6,7 @@
 #-----------------------#
 #   Loading libraries   #
 #-----------------------#
-packages <- c("ggplot2","tidyr","pcaMethods")
+packages <- c("ggplot2","tidyr","pcaMethods","ggfortify")
 if (!requireNamespace("BiocManager", quietly = TRUE)){
   install.packages("BiocManager")
   BiocManager::install(version = "3.13") 
@@ -177,31 +177,75 @@ for (i in 1:length(countries)){
     DataChange <- rbind(DataChange,dataTemp3)
   }
 }
+# pcaDat <- DataChange[,-c(1,2)]
+# pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
+# substring <- substr(DataChange$country,1,2)
+# pcaRes <- data.frame(DataChange,pcaDat@scores, substring)
+# plot(pcaDat@loadings)
+# ggplot(pcaRes,aes(x = PC1,y = PC2,color = copdDalys)) +
+#   geom_text(aes(label = substring)) +
+#   geom_segment(data=pcaD, aes(x=0, y=0, xend=PC1, yend=PC2)
+#                , arrow=arrow(length=unit(0.2,"cm")), alpha=0.25)
+# ggbiplot(as.data.frame(pcaDat@scores),as.data.frame(pcaDat@loadings))
+
 pcaDat <- DataChange[,-c(1,2)]
-pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
+pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
 substring <- substr(DataChange$country,1,2)
-pcaRes <- data.frame(DataChange,pcaDat@scores,substring)
+pcaRes <- data.frame(DataChange, substring)
+autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
+         label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
 
-ggplot(pcaRes,aes(x = PC3,y = PC4,color = copdDalys)) +
-  geom_text(aes(label = substring)) 
-#Exporting change data
-write.csv(DataChange,"data_change.csv",quote = FALSE)
-#min-max Scaling
-DataChangeMinMax <- DataChange
-DataChangeMinMax[,-c(1,2)] <- apply(DataChangeMinMax[,-c(1,2)],2,function(x){
-   (x - min(x))/(max(x)-min(x))
-})
+#Removing samples with the two smallest PC1
+PC1 <- pcaDat$x[,'PC1']
+smallestTwo <- sort(PC1)[c(1,2)]
+DataChangeTemp <- data.frame(DataChange,PC1 %in% smallestTwo)
+colnames(DataChangeTemp)[12] <- 'Outlier'
+ggplot(DataChangeTemp[DataChangeTemp$country=="Russian Federation",],
+       aes(year,GHG,colour = Outlier))+
+  geom_point()+
+  theme(axis.text.x = element_text(angle = 90))
 
-pcaDat <- DataChangeMinMax[,-c(1,2)]
-pcaDat <- pca(pcaDat,nPcs = 6,scale = "none")
-substring <- substr(DataChangeMinMax$country,1,2)
-pcaRes <- data.frame(DataChangeMinMax[,c(1,2)],pcaDat@scores,substring)
+DataChange <- DataChange[!(PC1 %in% smallestTwo),]
 
-ggplot(pcaRes,aes(x = PC1,y = PC2,color = country)) +
-  geom_text(aes(label = substring)) 
+
+pcaDat <- DataChange[,-c(1,2)]
+pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
+substring <- substr(DataChange$country,1,2)
+pcaRes <- data.frame(DataChange, substring)
+autoplot(pcaDat,x = 1,y = 2,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
+         label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
+
+
+#Removing samples with the two largest PC1
+PC1 <- pcaDat$x[,'PC1']
+largestTwo <- sort(PC1, decreasing = TRUE)[c(1,2)]
+DataChangeTemp <- data.frame(DataChange,PC1 %in% largestTwo)
+colnames(DataChangeTemp)[12] <- 'Outlier'
+ggplot(DataChangeTemp[DataChangeTemp$country=="Russian Federation",],
+       aes(year,CO2,colour = Outlier))+
+  geom_point()+
+  theme(axis.text.x = element_text(angle = 90))
+
+#DataChange <- DataChange[!(PC1 %in% largestTwo),]
+
+
+
+# 
+# #min-max Scaling
+# DataChange[,-c(1,2)] <- apply(DataChange[,-c(1,2)],2,function(x){
+#    (x - min(x))/(max(x)-min(x))
+# })
+# 
+# pcaDat <- DataChange[,-c(1,2)]
+# pcaDat <- pca(pcaDat,nPcs = 6,scale = "none")
+# substring <- substr(DataChange$country,1,2)
+# pcaRes <- data.frame(DataChange[,c(1,2)],pcaDat@scores,substring)
+# 
+# ggplot(pcaRes,aes(x = PC1,y = PC2,color = country)) +
+#   geom_text(aes(label = substring)) 
 #Exploring relationship
-for (var in colnames(DataChangeMinMax)[-c(1,2,11)]){
-  plot(DataChangeMinMax[,var],DataChangeMinMax$copdDalys,xlab = var,ylab = "COPD Dalys")
+for (var in colnames(DataChange)[-c(1,2,11)]){
+  plot(DataChange[,var],DataChange$copdDalys,xlab = var,ylab = "COPD Dalys")
 }
 
 #creating shifted data
@@ -209,7 +253,7 @@ dataShifted <- vector(mode = "list",5)
 shifts <- 1:5
 for (i in 1:length(shifts)){
   for (ii in 1:length(countries)){
-    dataTemp <- DataChangeMinMax[DataChangeMinMax$country == countries[ii],]
+    dataTemp <- DataChange[DataChange$country == countries[ii],]
     predTemp <- dataTemp[-((nrow(dataTemp)-shifts[i]+1):nrow(dataTemp)),-ncol(dataTemp)]
     critTemp <- dataTemp[-(1:shifts[i]),ncol(dataTemp)]
     dataTemp <- data.frame(predTemp,critTemp)
@@ -224,13 +268,13 @@ for (i in 1:length(shifts)){
   names(dataShifted)[i] <- paste0("YearMinus",shifts[i])
   colnames(dataShifted[[i]])[11] <- "copdDalys"
 }
-for (var in colnames(dataShifted[[i]])[-c(1,2,11)]){
-  for (i in 1:length(dataShifted)){
-  
-    plot(dataShifted[[i]][,var],dataShifted[[i]]$copdDalys,
-         main = names(dataShifted)[i],xlab = var,ylab = "COPD Dalys")
-  }
-}
+# for (var in colnames(dataShifted[[i]])[-c(1,2,11)]){
+#   for (i in 1:length(dataShifted)){
+#   
+#     plot(dataShifted[[i]][,var],dataShifted[[i]]$copdDalys,
+#          main = names(dataShifted)[i],xlab = var,ylab = "COPD Dalys")
+#   }
+# }
 
 ##Aggregating years:
 #Per three years
@@ -264,12 +308,11 @@ for (i in 1:length(countries)){
 
 #PCA
 pcaDat <- DataAggThree[,-c(1,2)]
-pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
+pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
 substring <- substr(DataAggThree$country,1,2)
-pcaRes <- data.frame(DataAggThree,pcaDat@scores,substring)
-
-ggplot(pcaRes,aes(x = PC1,y = PC2,color = copdDalys)) +
-  geom_text(aes(label = substring)) 
+pcaRes <- data.frame(DataAggThree, substring)
+autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
+         label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
 #Exploring relationship
 for (var in colnames(DataAggThree)[-c(1,2,11)]){
   plot(DataAggThree[,var],DataAggThree$copdDalys,xlab = var,ylab = "COPD Dalys")
@@ -306,16 +349,33 @@ for (i in 1:length(countries)){
 
 #PCA
 pcaDat <- DataAggNine[,-c(1,2)]
-pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
+pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
 substring <- substr(DataAggNine$country,1,2)
-pcaRes <- data.frame(DataAggNine,pcaDat@scores,substring)
-
-ggplot(pcaRes,aes(x = PC1,y = PC2,color = copdDalys)) +
-  geom_text(aes(label = substring)) 
+pcaRes <- data.frame(DataAggNine, substring)
+autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
+         label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
 #Exploring relationship
 for (var in colnames(DataAggNine)[-c(1,2,11)]){
   plot(DataAggNine[,var],DataAggNine$copdDalys,xlab = var,ylab = "COPD Dalys")
 }
 
 
-
+#Creating complete shifted model Y + Y-1
+for (i in 1:length(countries)){
+  Y <- DataChange[DataChange$country == countries[i],]
+  Y <- Y[-1,]
+  YminusOne <- DataChange[DataChange$country == countries[i],]
+  YminusOne <- YminusOne[-nrow(YminusOne),-c(1,2)]
+  colnames(YminusOne) <- paste0("prev_",colnames(YminusOne))
+  
+  dataTemp <- cbind(Y,YminusOne)
+  if (i == 1){DataY_YminusOne <- dataTemp
+  }else {DataY_YminusOne <-  rbind(DataY_YminusOne ,dataTemp)}
+}
+pcaDat <- DataY_YminusOne[,-c(1,2)]
+pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
+substring <- substr(DataY_YminusOne$country,1,2)
+pcaRes <- data.frame(DataY_YminusOne, substring)
+autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
+         label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
+write.csv(DataY_YminusOne,file = "Data_Y_Y_minus_One.csv",quote = FALSE)
