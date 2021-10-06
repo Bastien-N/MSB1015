@@ -6,7 +6,7 @@
 #-----------------------#
 #   Loading libraries   #
 #-----------------------#
-packages <- c("ggplot2","tidyr","pcaMethods")
+packages <- c("ggplot2","tidyr","pcaMethods","ggfortify")
 if (!requireNamespace("BiocManager", quietly = TRUE)){
   install.packages("BiocManager")
   BiocManager::install(version = "3.13") 
@@ -157,7 +157,7 @@ pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
 substring <- substr(Data$country,1,2)
 pcaRes <- data.frame(Data[,c(1,2)],pcaDat@scores,substring)
 
-ggplot(pcaRes,aes(x = PC3,y = PC4,color = year)) +
+ggplot(pcaRes,aes(x = PC1,y = PC2,color = year)) +
   geom_text(aes(label = substring)) 
 #Transforming data into change (year-previous year)
 countries <- unique(Data$country)
@@ -177,14 +177,55 @@ for (i in 1:length(countries)){
     DataChange <- rbind(DataChange,dataTemp3)
   }
 }
-pcaDat <- DataChange[,-c(1,2)]
-pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
-substring <- substr(DataChange$country,1,2)
-pcaRes <- data.frame(DataChange,pcaDat@scores,substring)
+# pcaDat <- DataChange[,-c(1,2)]
+# pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
+# substring <- substr(DataChange$country,1,2)
+# pcaRes <- data.frame(DataChange,pcaDat@scores, substring)
+# plot(pcaDat@loadings)
+# ggplot(pcaRes,aes(x = PC1,y = PC2,color = copdDalys)) +
+#   geom_text(aes(label = substring)) +
+#   geom_segment(data=pcaD, aes(x=0, y=0, xend=PC1, yend=PC2)
+#                , arrow=arrow(length=unit(0.2,"cm")), alpha=0.25)
+# ggbiplot(as.data.frame(pcaDat@scores),as.data.frame(pcaDat@loadings))
 
-ggplot(pcaRes,aes(x = PC1,y = PC2,color = copdDalys)) +
-  geom_text(aes(label = substring)) 
-plotPcs(pcaDat)
+pcaDat <- DataChange[,-c(1,2)]
+pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
+substring <- substr(DataChange$country,1,2)
+pcaRes <- data.frame(DataChange, substring)
+autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
+         label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
+
+#Removing samples with the two smallest PC1
+PC1 <- pcaDat$x[,'PC1']
+smallestTwo <- sort(PC1)[c(1,2)]
+DataChangeTemp <- data.frame(DataChange,PC1 %in% smallestTwo)
+colnames(DataChangeTemp)[12] <- 'Outlier'
+DataChange <- DataChange[!(PC1 %in% smallestTwo),]
+
+
+pcaDat <- DataChange[,-c(1,2)]
+pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
+substring <- substr(DataChange$country,1,2)
+pcaRes <- data.frame(DataChange, substring)
+autoplot(pcaDat,x = 1,y = 2,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
+         label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
+
+ggplot(DataChangeTemp[DataChangeTemp$country=="Russian Federation",],
+       aes(year,GHG,colour = Outlier))+
+  geom_point()+
+  theme(axis.text.x = element_text(angle = 90))
+#Removing samples with the two largest PC1
+PC1 <- pcaDat$x[,'PC1']
+largestTwo <- sort(PC1, decreasing = TRUE)[c(1,2)]
+DataChangeTemp <- data.frame(DataChange,PC1 %in% largestTwo)
+colnames(DataChangeTemp)[12] <- 'Outlier'
+DataChange <- DataChange[!(PC1 %in% largestTwo),]
+
+
+ggplot(DataChangeTemp[DataChangeTemp$country=="Russian Federation",],
+       aes(year,CO2,colour = Outlier))+
+  geom_point()+
+  theme(axis.text.x = element_text(angle = 90))
 # 
 # #min-max Scaling
 # DataChange[,-c(1,2)] <- apply(DataChange[,-c(1,2)],2,function(x){
@@ -223,13 +264,13 @@ for (i in 1:length(shifts)){
   names(dataShifted)[i] <- paste0("YearMinus",shifts[i])
   colnames(dataShifted[[i]])[11] <- "copdDalys"
 }
-for (var in colnames(dataShifted[[i]])[-c(1,2,11)]){
-  for (i in 1:length(dataShifted)){
-  
-    plot(dataShifted[[i]][,var],dataShifted[[i]]$copdDalys,
-         main = names(dataShifted)[i],xlab = var,ylab = "COPD Dalys")
-  }
-}
+# for (var in colnames(dataShifted[[i]])[-c(1,2,11)]){
+#   for (i in 1:length(dataShifted)){
+#   
+#     plot(dataShifted[[i]][,var],dataShifted[[i]]$copdDalys,
+#          main = names(dataShifted)[i],xlab = var,ylab = "COPD Dalys")
+#   }
+# }
 
 ##Aggregating years:
 #Per three years
@@ -263,12 +304,11 @@ for (i in 1:length(countries)){
 
 #PCA
 pcaDat <- DataAggThree[,-c(1,2)]
-pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
+pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
 substring <- substr(DataAggThree$country,1,2)
-pcaRes <- data.frame(DataAggThree,pcaDat@scores,substring)
-
-ggplot(pcaRes,aes(x = PC1,y = PC2,color = copdDalys)) +
-  geom_text(aes(label = substring)) 
+pcaRes <- data.frame(DataAggThree, substring)
+autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
+         label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
 #Exploring relationship
 for (var in colnames(DataAggThree)[-c(1,2,11)]){
   plot(DataAggThree[,var],DataAggThree$copdDalys,xlab = var,ylab = "COPD Dalys")
@@ -305,16 +345,32 @@ for (i in 1:length(countries)){
 
 #PCA
 pcaDat <- DataAggNine[,-c(1,2)]
-pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
+pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
 substring <- substr(DataAggNine$country,1,2)
-pcaRes <- data.frame(DataAggNine,pcaDat@scores,substring)
-
-ggplot(pcaRes,aes(x = PC1,y = PC2,color = copdDalys)) +
-  geom_text(aes(label = substring)) 
+pcaRes <- data.frame(DataAggNine, substring)
+autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
+         label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
 #Exploring relationship
 for (var in colnames(DataAggNine)[-c(1,2,11)]){
   plot(DataAggNine[,var],DataAggNine$copdDalys,xlab = var,ylab = "COPD Dalys")
 }
 
 
-
+#Creating complete shifted model Y + Y-1
+for (i in 1:length(countries)){
+  Y <- DataChange[DataChange$country == countries[i],]
+  Y <- Y[-1,]
+  YminusOne <- DataChange[DataChange$country == countries[i],]
+  YminusOne <- YminusOne[-nrow(YminusOne),-c(1,2)]
+  colnames(YminusOne) <- paste0("prev_",colnames(YminusOne))
+  
+  dataTemp <- cbind(Y,YminusOne)
+  if (i == 1){DataY_YminusOne <- dataTemp
+  }else {DataY_YminusOne <-  rbind(DataY_YminusOne ,dataTemp)}
+}
+pcaDat <- DataY_YminusOne[,-c(1,2)]
+pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
+substring <- substr(DataY_YminusOne$country,1,2)
+pcaRes <- data.frame(DataY_YminusOne, substring)
+autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
+         label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
