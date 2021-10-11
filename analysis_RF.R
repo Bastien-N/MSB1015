@@ -63,9 +63,10 @@ RFdata <- lapply(trainSets,function(trainSet){
   fold[[6]] <- data[trainSet,11] #ytrain
   return(fold)
 })
-system.time({
+system.time({ 
   coreNum <- parallel::detectCores()
   clust <- parallel::makeCluster(coreNum-1)
+  rf <- vector('list',nrow(param))
   for (i in 1:nrow(param)){
     print(paste0("Running over parameter set ",i,"..."))
     mtry <- as.numeric(param[i,1])
@@ -75,7 +76,7 @@ system.time({
     
     
     clusterExport(cl = clust,varlist = c("mtry","nodesize","maxnodes"))
-    rf <- parLapply(cl = clust,RFdata,function(fold){
+    rf[[i]] <- parLapply(cl = clust,RFdata,function(fold){
       
       xtest <- fold[[3]]
       xtrain <- fold[[4]]
@@ -85,11 +86,11 @@ system.time({
       res <- randomForest::randomForest(x = xtrain,y = ytrain,
                                         xtest = xtest,ytest = ytest,
                                         mtry = mtry,nodesize = nodesize,maxnodes = maxnodes,
-                                        keep.forest = TRUE,ntree = 500)
+                                        keep.forest = FALSE,ntree = 200)
       return(res)  
     })
     print(paste0("Running over parameter set ",i,"...","DONE"))
-    assign(paste0('rf_',i),rf,pos = .GlobalEnv)
+    #assign(paste0('rf_',i),rf,pos = .GlobalEnv)
   }
   stopCluster(cl = clust)
 })
@@ -200,31 +201,49 @@ system.time({
 #   return(res)
 #   
 # }) 
-cvPredByParam <- vector('list',length = length(param))
-samples <- 1:nrow(data)
-predictionDf <- data.frame(data[,ncol(data)],row.names = samples)
-for (i in 1:length(cvPredByParam)){
- for (ii in 1:length(testSets)){
-    testSamples <- testSets[[ii]]
-    predicted <- eval(parse(text = paste0("rf_",ii)))[[i]][['test']][['predicted']]
-    temp <- data.frame(predicted,row.names = testSamples)
-    if (ii ==1){
-      temp2 <- temp
-    }else{
-      temp2 <- merge.data.frame(temp2,temp,by = 0,all = TRUE)
-      row.names(temp2) <- temp2$Row.names
-      temp2 <- temp2[,-1]
-      colnames(temp2) <- 1:ncol(temp2)
-    }
-    
+############################################################
+#Gathering prediction results
+cvPredByParam <- lapply(rf,function(pSet){
+  dataTemp <- as.data.frame(matrix(rep(0,nrow(data)*(length(rf))),ncol = length(rf)))
+  for (i in 1:length(RFdata)){
+    samples <- RFdata[[i]][[2]]
+    predicted <- pSet[[i]][['test']][['predicted']]
+    temp <- rep(NA,nrow(data))
+    temp[samples] <- predicted
+    dataTemp[,i] <- temp
   }
-  temp3 <-  merge.data.frame(predictionDf,temp2,by = 0,all = TRUE)
-  row.names(temp3) <- temp3$Row.names
-  temp3 <- temp3[,-1]
-  colnames(temp3) <- c('copd',paste0("pred_Fold_",seq(length(testSets))))
-  cvPredByParam[[i]] <- temp3
-}
-m <- rowMeans(cvPredByParam[[1]][,-1],na.rm = TRUE)
-s <- apply(cvPredByParam[[1]][,-1],1,sd,na.rm = TRUE)
-plotData <- data.frame(cvPredByParam[[1]][,1],m,s)
-                       
+  colnames(dataTemp) <- names(RFdata)
+  return(dataTemp)
+})
+names(cvPredByParam) <- paste0('p_set_',1:length(rf))
+#Calculating means
+
+###########################################################"
+# cvPredByParam <- vector('list',length = length(param))
+# samples <- 1:nrow(data)
+# predictionDf <- data.frame(data[,ncol(data)],row.names = samples)
+# for (i in 1:length(cvPredByParam)){
+#  for (ii in 1:length(testSets)){
+#     testSamples <- testSets[[ii]]
+#     predicted <- eval(parse(text = paste0("rf_",ii)))[[i]][['test']][['predicted']]
+#     temp <- data.frame(predicted,row.names = testSamples)
+#     if (ii ==1){
+#       temp2 <- temp
+#     }else{
+#       temp2 <- merge.data.frame(temp2,temp,by = 0,all = TRUE)
+#       row.names(temp2) <- temp2$Row.names
+#       temp2 <- temp2[,-1]
+#       colnames(temp2) <- 1:ncol(temp2)
+#     }
+#     
+#   }
+#   temp3 <-  merge.data.frame(predictionDf,temp2,by = 0,all = TRUE)
+#   row.names(temp3) <- temp3$Row.names
+#   temp3 <- temp3[,-1]
+#   colnames(temp3) <- c('copd',paste0("pred_Fold_",seq(length(testSets))))
+#   cvPredByParam[[i]] <- temp3
+# }
+# m <- rowMeans(cvPredByParam[[1]][,-1],na.rm = TRUE)
+# s <- apply(cvPredByParam[[1]][,-1],1,sd,na.rm = TRUE)
+# plotData <- data.frame(cvPredByParam[[1]][,1],m,s)
+#                        
