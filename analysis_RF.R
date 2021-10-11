@@ -3,7 +3,7 @@
 #----------------#
 #dat <- "data_change.csv"
 dat <- "Data_Y_Y_minus_One.csv" #Which version of the cleaned dataset to be used
-nRun <- 5 #Number of separate runs
+nRun <- 20 #Number of separate runs
 #-----------------------#
 #   Loading libraries   #
 #-----------------------#
@@ -86,7 +86,7 @@ system.time({
       res <- randomForest::randomForest(x = xtrain,y = ytrain,
                                         xtest = xtest,ytest = ytest,
                                         mtry = mtry,nodesize = nodesize,maxnodes = maxnodes,
-                                        keep.forest = FALSE,ntree = 200)
+                                        keep.forest = FALSE,ntree = 500)
       return(res)  
     })
     print(paste0("Running over parameter set ",i,"...","DONE"))
@@ -94,6 +94,7 @@ system.time({
   }
   stopCluster(cl = clust)
 })
+save(data,rf,RFdata,file = "RF_saved_data.RData")
 #######################################################
 # trainSets <- caret::groupKFold(group = data$country,k = 39)
 # #makin
