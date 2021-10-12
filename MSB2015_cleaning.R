@@ -200,6 +200,11 @@ PC1 <- pcaDat$x[,'PC1']
 smallestTwo <- sort(PC1)[c(1,2)]
 DataChangeTemp <- data.frame(DataChange,PC1 %in% smallestTwo)
 colnames(DataChangeTemp)[12] <- 'Outlier'
+ggplot(DataChangeTemp[DataChangeTemp$country=="Russian Federation",],
+       aes(year,GHG,colour = Outlier))+
+  geom_point()+
+  theme(axis.text.x = element_text(angle = 90))
+
 DataChange <- DataChange[!(PC1 %in% smallestTwo),]
 
 
@@ -210,22 +215,21 @@ pcaRes <- data.frame(DataChange, substring)
 autoplot(pcaDat,x = 1,y = 2,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
          label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
 
-ggplot(DataChangeTemp[DataChangeTemp$country=="Russian Federation",],
-       aes(year,GHG,colour = Outlier))+
-  geom_point()+
-  theme(axis.text.x = element_text(angle = 90))
+
 #Removing samples with the two largest PC1
 PC1 <- pcaDat$x[,'PC1']
 largestTwo <- sort(PC1, decreasing = TRUE)[c(1,2)]
 DataChangeTemp <- data.frame(DataChange,PC1 %in% largestTwo)
 colnames(DataChangeTemp)[12] <- 'Outlier'
-DataChange <- DataChange[!(PC1 %in% largestTwo),]
-
-
 ggplot(DataChangeTemp[DataChangeTemp$country=="Russian Federation",],
        aes(year,CO2,colour = Outlier))+
   geom_point()+
   theme(axis.text.x = element_text(angle = 90))
+
+#DataChange <- DataChange[!(PC1 %in% largestTwo),]
+
+
+
 # 
 # #min-max Scaling
 # DataChange[,-c(1,2)] <- apply(DataChange[,-c(1,2)],2,function(x){
@@ -374,3 +378,4 @@ substring <- substr(DataY_YminusOne$country,1,2)
 pcaRes <- data.frame(DataY_YminusOne, substring)
 autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
          label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
+write.csv(DataY_YminusOne,file = "Data_Y_Y_minus_One.csv",quote = FALSE)
