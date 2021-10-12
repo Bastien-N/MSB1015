@@ -196,18 +196,7 @@ autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substr
          label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
 
 ######################################"
-#URF
-urf <- isolation.forest(DataChange[,-c(1,2)],output_score = TRUE)
-plot(urf[['scores']])
-out <- urf[['scores']]
-names(out) <- 1:length(out)
-topOut <- names(sort(out,decreasing = TRUE)[1])
-outlying <- rep(FALSE,length(out))
-outlying[as.numeric(topOut)] <- TRUE
-pcaResTemp <- data.frame(pcaRes,outlying)
 
-autoplot(pcaDat,data = pcaResTemp , label = TRUE,shape = FALSE,label.label = 'substring',
-         label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE,label.colour = 'outlying')
 ####################################""
 # #Removing samples with the two smallest PC1
 # PC1 <- pcaDat$x[,'PC1']
@@ -257,31 +246,31 @@ autoplot(pcaDat,data = pcaResTemp , label = TRUE,shape = FALSE,label.label = 'su
 # 
 # ggplot(pcaRes,aes(x = PC1,y = PC2,color = country)) +
 #   geom_text(aes(label = substring)) 
-#Exploring relationship
-for (var in colnames(DataChange)[-c(1,2,11)]){
-  plot(DataChange[,var],DataChange$copdDalys,xlab = var,ylab = "COPD Dalys")
-}
-
-#creating shifted data
-dataShifted <- vector(mode = "list",5)
-shifts <- 1:5
-for (i in 1:length(shifts)){
-  for (ii in 1:length(countries)){
-    dataTemp <- DataChange[DataChange$country == countries[ii],]
-    predTemp <- dataTemp[-((nrow(dataTemp)-shifts[i]+1):nrow(dataTemp)),-ncol(dataTemp)]
-    critTemp <- dataTemp[-(1:shifts[i]),ncol(dataTemp)]
-    dataTemp <- data.frame(predTemp,critTemp)
-    if (ii == 1){
-      dataTemp2 <- dataTemp
-    }
-    else{
-      dataTemp2 <- rbind(dataTemp2,dataTemp)
-    }
-  }
-  dataShifted[[i]] <- dataTemp2
-  names(dataShifted)[i] <- paste0("YearMinus",shifts[i])
-  colnames(dataShifted[[i]])[11] <- "copdDalys"
-}
+# #Exploring relationship
+# for (var in colnames(DataChange)[-c(1,2,11)]){
+#   plot(DataChange[,var],DataChange$copdDalys,xlab = var,ylab = "COPD Dalys")
+# }
+# 
+# #creating shifted data
+# dataShifted <- vector(mode = "list",5)
+# shifts <- 1:5
+# for (i in 1:length(shifts)){
+#   for (ii in 1:length(countries)){
+#     dataTemp <- DataChange[DataChange$country == countries[ii],]
+#     predTemp <- dataTemp[-((nrow(dataTemp)-shifts[i]+1):nrow(dataTemp)),-ncol(dataTemp)]
+#     critTemp <- dataTemp[-(1:shifts[i]),ncol(dataTemp)]
+#     dataTemp <- data.frame(predTemp,critTemp)
+#     if (ii == 1){
+#       dataTemp2 <- dataTemp
+#     }
+#     else{
+#       dataTemp2 <- rbind(dataTemp2,dataTemp)
+#     }
+#   }
+#   dataShifted[[i]] <- dataTemp2
+#   names(dataShifted)[i] <- paste0("YearMinus",shifts[i])
+#   colnames(dataShifted[[i]])[11] <- "copdDalys"
+# }
 # for (var in colnames(dataShifted[[i]])[-c(1,2,11)]){
 #   for (i in 1:length(dataShifted)){
 #   
@@ -289,90 +278,90 @@ for (i in 1:length(shifts)){
 #          main = names(dataShifted)[i],xlab = var,ylab = "COPD Dalys")
 #   }
 # }
-
-##Aggregating years:
-#Per three years
-dataTemp <- dataTemp2 <- dataTemp3 <- DataAggThree<- NULL
-for (i in 1:length(countries)){
-  
-  dataTemp <- DataChange[DataChange$country == countries[i],]
-  years <- unique(dataTemp$year)
-  for (ii in 1:9){
-    yearsTemp <- years[(1+(ii-1)*3):(ii*3)]
-    dataTemp2 <- dataTemp[dataTemp$year %in% yearsTemp,]
-    
-    if (nrow(dataTemp2) == 3){
-
-      dataTemp2 <- data.frame(dataTemp2[1,1],
-                              paste0(substr(yearsTemp[1],1,4),'_to_',substr(yearsTemp[3],1,4)),
-                                     t(colSums(dataTemp2[,-c(1,2)])))
-      colnames(dataTemp2) <- colnames(DataChange)
-      if (ii == 1){
-        dataTemp3 <- dataTemp2
-      }
-      else{
-        dataTemp3 <- rbind(dataTemp3,dataTemp2)
-      }
-    }
-
-  }
-  if (i == 1){DataAggThree <- dataTemp3}
-  else{DataAggThree <- rbind(DataAggThree,dataTemp3)}
-}
-
-#PCA
-pcaDat <- DataAggThree[,-c(1,2)]
-pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
-substring <- substr(DataAggThree$country,1,2)
-pcaRes <- data.frame(DataAggThree, substring)
-autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
-         label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
-#Exploring relationship
-for (var in colnames(DataAggThree)[-c(1,2,11)]){
-  plot(DataAggThree[,var],DataAggThree$copdDalys,xlab = var,ylab = "COPD Dalys")
-}
-##Aggregating years:
-#Per nine years
-dataTemp <- dataTemp2 <- dataTemp3 <- DataAggNine<- NULL
-for (i in 1:length(countries)){
-  
-  dataTemp <- DataChange[DataChange$country == countries[i],]
-  years <- unique(dataTemp$year)
-  for (ii in 1:3){
-    yearsTemp <- years[(1+(ii-1)*9):(ii*9)]
-    dataTemp2 <- dataTemp[dataTemp$year %in% yearsTemp,]
-    
-    if (nrow(dataTemp2) == 9){
-      
-      dataTemp2 <- data.frame(dataTemp2[1,1],
-                              paste0(substr(yearsTemp[1],1,4),'_to_',substr(yearsTemp[3],1,4)),
-                              t(colSums(dataTemp2[,-c(1,2)])))
-      colnames(dataTemp2) <- colnames(DataChange)
-      if (ii == 1){
-        dataTemp3 <- dataTemp2
-      }
-      else{
-        dataTemp3 <- rbind(dataTemp3,dataTemp2)
-      }
-    }
-    
-  }
-  if (i == 1){DataAggNine <- dataTemp3}
-  else{DataAggNine <- rbind(DataAggNine,dataTemp3)}
-}
-
-#PCA
-pcaDat <- DataAggNine[,-c(1,2)]
-pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
-substring <- substr(DataAggNine$country,1,2)
-pcaRes <- data.frame(DataAggNine, substring)
-autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
-         label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
-#Exploring relationship
-for (var in colnames(DataAggNine)[-c(1,2,11)]){
-  plot(DataAggNine[,var],DataAggNine$copdDalys,xlab = var,ylab = "COPD Dalys")
-}
-
+# 
+# ##Aggregating years:
+# #Per three years
+# dataTemp <- dataTemp2 <- dataTemp3 <- DataAggThree<- NULL
+# for (i in 1:length(countries)){
+#   
+#   dataTemp <- DataChange[DataChange$country == countries[i],]
+#   years <- unique(dataTemp$year)
+#   for (ii in 1:9){
+#     yearsTemp <- years[(1+(ii-1)*3):(ii*3)]
+#     dataTemp2 <- dataTemp[dataTemp$year %in% yearsTemp,]
+#     
+#     if (nrow(dataTemp2) == 3){
+# 
+#       dataTemp2 <- data.frame(dataTemp2[1,1],
+#                               paste0(substr(yearsTemp[1],1,4),'_to_',substr(yearsTemp[3],1,4)),
+#                                      t(colSums(dataTemp2[,-c(1,2)])))
+#       colnames(dataTemp2) <- colnames(DataChange)
+#       if (ii == 1){
+#         dataTemp3 <- dataTemp2
+#       }
+#       else{
+#         dataTemp3 <- rbind(dataTemp3,dataTemp2)
+#       }
+#     }
+# 
+#   }
+#   if (i == 1){DataAggThree <- dataTemp3}
+#   else{DataAggThree <- rbind(DataAggThree,dataTemp3)}
+# }
+# 
+# #PCA
+# pcaDat <- DataAggThree[,-c(1,2)]
+# pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
+# substring <- substr(DataAggThree$country,1,2)
+# pcaRes <- data.frame(DataAggThree, substring)
+# autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
+#          label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
+# #Exploring relationship
+# for (var in colnames(DataAggThree)[-c(1,2,11)]){
+#   plot(DataAggThree[,var],DataAggThree$copdDalys,xlab = var,ylab = "COPD Dalys")
+# }
+# ##Aggregating years:
+# #Per nine years
+# dataTemp <- dataTemp2 <- dataTemp3 <- DataAggNine<- NULL
+# for (i in 1:length(countries)){
+#   
+#   dataTemp <- DataChange[DataChange$country == countries[i],]
+#   years <- unique(dataTemp$year)
+#   for (ii in 1:3){
+#     yearsTemp <- years[(1+(ii-1)*9):(ii*9)]
+#     dataTemp2 <- dataTemp[dataTemp$year %in% yearsTemp,]
+#     
+#     if (nrow(dataTemp2) == 9){
+#       
+#       dataTemp2 <- data.frame(dataTemp2[1,1],
+#                               paste0(substr(yearsTemp[1],1,4),'_to_',substr(yearsTemp[3],1,4)),
+#                               t(colSums(dataTemp2[,-c(1,2)])))
+#       colnames(dataTemp2) <- colnames(DataChange)
+#       if (ii == 1){
+#         dataTemp3 <- dataTemp2
+#       }
+#       else{
+#         dataTemp3 <- rbind(dataTemp3,dataTemp2)
+#       }
+#     }
+#     
+#   }
+#   if (i == 1){DataAggNine <- dataTemp3}
+#   else{DataAggNine <- rbind(DataAggNine,dataTemp3)}
+# }
+# 
+# #PCA
+# pcaDat <- DataAggNine[,-c(1,2)]
+# pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
+# substring <- substr(DataAggNine$country,1,2)
+# pcaRes <- data.frame(DataAggNine, substring)
+# autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
+#          label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
+# #Exploring relationship
+# for (var in colnames(DataAggNine)[-c(1,2,11)]){
+#   plot(DataAggNine[,var],DataAggNine$copdDalys,xlab = var,ylab = "COPD Dalys")
+# }
+# 
 
 #Creating complete shifted model Y + Y-1
 for (i in 1:length(countries)){
@@ -393,3 +382,30 @@ pcaRes <- data.frame(DataY_YminusOne, substring)
 autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
          label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
 write.csv(DataY_YminusOne,file = "Data_Y_Y_minus_One.csv",quote = FALSE)
+
+#
+urf <- isolation.forest(DataY_YminusOne[,-c(1,2)],output_score = TRUE)
+plot(urf[['scores']])
+out <- urf[['scores']]
+names(out) <- 1:length(out)
+topOut <- names(sort(out,decreasing = TRUE)[1:10])
+outlying <- rep(FALSE,length(out))
+outlying[as.numeric(topOut)] <- TRUE
+pcaResTemp <- data.frame(pcaRes,outlying)
+
+plot <- autoplot(pcaDat,data = pcaResTemp , label = TRUE,shape = FALSE,label.label = 'substring',
+         label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE,label.colour = 'outlying')
+print(plot)
+#Assessing place of outliers in the data
+dataOut <- data.frame(DataY_YminusOne,outlying)
+DataY_YminusOne[outlying,1]
+ggplot(data = dataOut[dataOut$country == "Russian Federation",],aes(x = year,y = copdDalys,color = outlying)) +
+         geom_point()+
+         theme(axis.text.x = element_text(angle = 90))
+ggplot(data = dataOut[dataOut$country == "Uzbekistan",],aes(x = year,y = copdDalys,color = outlying)) +
+  geom_point()+
+  theme(axis.text.x = element_text(angle = 90))
+
+#Removing outliers
+noOutDataY_YminusOne <- DataY_YminusOne[outlying,]
+write.csv(noOutDataY_YminusOne,file = "noOutData_Y_Y_minus_One.csv",quote = FALSE)
