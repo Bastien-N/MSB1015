@@ -387,8 +387,9 @@ write.csv(DataY_YminusOne,file = "Data_Y_Y_minus_One.csv",quote = FALSE)
 urf <- isolation.forest(DataY_YminusOne[,-c(1,2)],output_score = TRUE)
 plot(urf[['scores']])
 out <- urf[['scores']]
+plot(out)
 names(out) <- 1:length(out)
-topOut <- names(sort(out,decreasing = TRUE)[1:10])
+topOut <- names(sort(out,decreasing = TRUE)[1:15])
 outlying <- rep(FALSE,length(out))
 outlying[as.numeric(topOut)] <- TRUE
 pcaResTemp <- data.frame(pcaRes,outlying)
@@ -405,7 +406,12 @@ ggplot(data = dataOut[dataOut$country == "Russian Federation",],aes(x = year,y =
 ggplot(data = dataOut[dataOut$country == "Uzbekistan",],aes(x = year,y = copdDalys,color = outlying)) +
   geom_point()+
   theme(axis.text.x = element_text(angle = 90))
+ggplot(data = dataOut[dataOut$country == "Republic of Moldova",],aes(x = year,y = copdDalys,color = outlying)) +
+  geom_point()+
+  theme(axis.text.x = element_text(angle = 90))
 
 #Removing outliers
-noOutDataY_YminusOne <- DataY_YminusOne[outlying,]
+noOutDataY_YminusOne <- DataY_YminusOne[!outlying,]
 write.csv(noOutDataY_YminusOne,file = "noOutData_Y_Y_minus_One.csv",quote = FALSE)
+write.csv(DataY_YminusOne[outlying,],file = "outlying_data.csv",quote = FALSE)
+
