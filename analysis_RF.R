@@ -2,7 +2,7 @@
 #   User input   #
 #----------------#
 #dat <- "data_change.csv"
-dat <- "Data_Y_Y_minus_One.csv" #Which version of the cleaned dataset to be used
+dat <- "noOutData_Y_Y_minus_One.csv" #Which version of the cleaned dataset to be used
 nRun <- 20 #Number of separate runs
 #-----------------------#
 #   Loading libraries   #
@@ -23,12 +23,17 @@ for (p in packages){
 #------------------#
 #   Loading data   #
 #------------------#
-data <- read.csv(dat)
-data <- data[,-1]
+allData <- read.csv(dat)
+allData <- allData[,-1]
 #--------------#
 #   Analysis   #
 #--------------#
 set.seed(2021)
+
+
+#Removing two countries as test group
+mainTest <- data[allData$country == "Poland"|allData$country == "Netherlands",]
+data <- allData[allData$country != "Poland" & allData$country != "Netherlands",]
 #Setting parameter grid
 param.mtry <- c(round((ncol(data)-2)/9),
                 round((ncol(data)-2)/3),
@@ -36,23 +41,25 @@ param.mtry <- c(round((ncol(data)-2)/9),
 param.nodesize <- c(3,5,7)
 param.maxnodes <- c(0,10,100)
 param <- expand.grid(param.mtry,param.nodesize,param.maxnodes)
-#param <- split(param,1:nrow(param))
-###############################
-#Setting the training and test sets for 50 runs and 
+
+#Setting the training and test sets for nruns and 
 trainSets <- vector("list",nRun)
 for (i in 1:nRun){
-  trainSets[[i]] <- caret::groupKFold(group = data$country,k = 39)
+  trainSets[[i]] <- caret::groupKFold(group = data$country,k = 37)
   names(trainSets[[i]]) <- paste0("Run_",i,"_Fold_",1:length(trainSets[[i]]))
 }
+
 #aggregating them for computation efficiency
 trainSets <- do.call(c, trainSets)
-# testSets <- lapply(trainSets,function(trainSet){testSet <- setdiff(1:nrow(data),trainSet)})
-# 
-# xtest <- lapply(testSets,function(testSet){dat <- data[testSet,-c(1,11)]})
-# xtrain <- lapply(trainSets,function(trainSet){dat <- data[trainSet,-c(1,11)]})
-# ytest <- lapply(testSets,function(testSet){dat <- data[testSet,11]})
-# ytrain <- lapply(trainSets,function(trainSet){dat <- data[trainSet,11]})
+#Checking countries appear in the testing sets a sufficient number of times
+tests <- lapply(trainSets,function(trainSet){
+  test <- setdiff(1:nrow(data),trainSet)
+  test <- unique(data[test,1])
+})
+tests <- unlist(tests)
+table(tests)
 
+#Aggregating them for computation efficiency
 RFdata <- lapply(trainSets,function(trainSet){
   fold <- vector("list",6)
   fold[[1]] <- trainSet
@@ -86,7 +93,7 @@ system.time({
       res <- randomForest::randomForest(x = xtrain,y = ytrain,
                                         xtest = xtest,ytest = ytest,
                                         mtry = mtry,nodesize = nodesize,maxnodes = maxnodes,
-                                        keep.forest = FALSE,ntree = 500)
+                                        keep.forest = FALSE,ntree = 1500)
       return(res)  
     })
     print(paste0("Running over parameter set ",i,"...","DONE"))
@@ -94,7 +101,7 @@ system.time({
   }
   stopCluster(cl = clust)
 })
-save(data,rf,RFdata,file = "RF_saved_data.RData")
+save(data,mainTest,allData,rf,RFdata,file = "RF_saved_data.RData")
 #######################################################
 # trainSets <- caret::groupKFold(group = data$country,k = 39)
 # #makin
@@ -218,7 +225,9 @@ cvPredByParam <- lapply(rf,function(pSet){
 })
 names(cvPredByParam) <- paste0('p_set_',1:length(rf))
 #Calculating means
-
+meanRes <- rowMeans(cvPredByParam[[27]],na.rm = TRUE)
+plot(data$copdDalys,meanRes)
+cor(data$copdDalys,meanRes)
 ###########################################################"
 # cvPredByParam <- vector('list',length = length(param))
 # samples <- 1:nrow(data)
