@@ -30,10 +30,29 @@ allData <- allData[,-1]
 #--------------#
 set.seed(2021)
 
-
 #Removing two countries as test group
 mainTest <- data[allData$country == "Poland"|allData$country == "Netherlands",]
 data <- allData[allData$country != "Poland" & allData$country != "Netherlands",]
+
+#Verifying that the test set lies within he train set
+pcaRes <- prcomp(data[,-c(1,2)],scale. = TRUE,center = TRUE)
+loads <- pcaRes$rotation
+m <- pcaRes$center
+s <- pcaRes$scale
+scaledTest <-mainTest[,-c(1,2)]
+scaledTest <- apply(scaledTest,1,function(mat){
+  mat2<- mat - m
+  mat2 <- mat2/s
+  return(mat2)
+})
+pcaTest <-   t(t(loads) %*% scaledTest)
+pcaDat <- data.frame(pcaRes$x)
+pcaDat <- rbind(pcaDat,pcaTest)
+isTest <- rep(FALSE,nrow(pcaDat))
+isTest[(nrow(pcaDat)-nrow(pcaTest)):nrow(pcaDat)] <- TRUE
+pcaDat <- data.frame(pcaDat,isTest)
+ggplot(pcaDat,aes(PC1,PC2,colour = isTest))+
+  geom_point()
 #Setting parameter grid
 param.mtry <- c(round((ncol(data)-2)/9),
                 round((ncol(data)-2)/3),
@@ -101,7 +120,10 @@ system.time({
   }
   stopCluster(cl = clust)
 })
-save(data,mainTest,allData,rf,RFdata,file = "RF_saved_data.RData")
+for (dat in c('data','mainTest','allData','rf','RFdata')){
+  save(as.symbol(dat),file = paste0(dat,".Rdata"))
+}
+
 #######################################################
 # trainSets <- caret::groupKFold(group = data$country,k = 39)
 # #makin
