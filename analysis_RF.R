@@ -31,7 +31,7 @@ allData <- allData[,-1]
 set.seed(2021)
 
 #Removing two countries as test group
-mainTest <- data[allData$country == "Poland"|allData$country == "Netherlands",]
+mainTest <- allData[allData$country == "Poland"|allData$country == "Netherlands",]
 data <- allData[allData$country != "Poland" & allData$country != "Netherlands",]
 
 #Verifying that the test set lies within he train set
@@ -53,6 +53,7 @@ isTest[(nrow(pcaDat)-nrow(pcaTest)):nrow(pcaDat)] <- TRUE
 pcaDat <- data.frame(pcaDat,isTest)
 ggplot(pcaDat,aes(PC1,PC2,colour = isTest))+
   geom_point()
+ggsave("figures/pca_test-train.jpeg")
 #Setting parameter grid
 param.mtry <- c(round((ncol(data)-2)/9),
                 round((ncol(data)-2)/3),
@@ -120,162 +121,133 @@ system.time({
   }
   stopCluster(cl = clust)
 })
-for (dat in c('data','mainTest','allData','rf','RFdata')){
-  save(as.symbol(dat),file = paste0(dat,".Rdata"))
-}
 
-#######################################################
-# trainSets <- caret::groupKFold(group = data$country,k = 39)
-# #makin
-# testSets <- lapply(trainSets,function(trainSet){testSet <- setdiff(1:nrow(data),trainSet)})
-# 
-# xtest <- lapply(testSets,function(testSet){dat <- data[testSet,-c(1,11)]})
-# xtrain <- lapply(trainSets,function(trainSet){dat <- data[trainSet,-c(1,11)]})
-# ytest <- lapply(testSets,function(testSet){dat <- data[testSet,11]})
-# ytrain <- lapply(trainSets,function(trainSet){dat <- data[trainSet,11]})
-# system.time({ 
-#   for (i in 1:length(trainSets)){
-#     xte <- xtest[[i]]
-#     xtr <- xtrain[[i]]
-#     yte <- ytest[[i]]
-#     ytr <- ytrain[[i]]
-#     rf <- lapply(param,function(p){
-#       mtry <- p[1,1]
-#       nodesize <- p[1,2]
-#       if (p[1,3] == 0){maxnodes <- NULL}
-#       else{maxnodes <- p[1,3]}
-#       
-#       res <- randomForest::randomForest(x = xtrain[[i]],y = ytrain[[i]],
-#                                         xtest = xtest[[i]],ytest = ytest[[i]],
-#                                         mtry = mtry,nodesize = nodesize,maxnodes = maxnodes,
-#                                         keep.forest = TRUE,ntree = 100)
-#       
-#     })
-#     assign(paste0('rf_',i),rf,pos = .GlobalEnv)
-#   }
-#   })
-# system.time({
-#   coreNum <- parallel::detectCores()
-#   clust <- parallel::makeCluster(coreNum-1)
-#   clusterExport(cl = clust,varlist = c("xtest","xtrain","ytest","ytrain","param"))
-#   for (i in 1:length(trainSets)){
-#     clusterExport(cl = clust,varlist = c("i"))
-#     xte <- xtest[[i]]
-#     xtr <- xtrain[[i]]
-#     yte <- ytest[[i]]
-#     ytr <- ytrain[[i]]
-#     rf <- parLapply(cl = clust,X = param,function(p){
-#       mtry <- p[1,1]
-#       nodesize <- p[1,2]
-#       if (p[1,3] == 0){maxnodes <- NULL}
-#       else{maxnodes <- p[1,3]}
-#       
-#       res <- randomForest::randomForest(x = xtrain[[i]],y = ytrain[[i]],
-#                                         xtest = xtest[[i]],ytest = ytest[[i]],
-#                                         mtry = mtry,nodesize = nodesize,maxnodes = maxnodes,
-#                                         keep.forest = TRUE,ntree = 500)
-#       
-#     })
-#     assign(paste0('rf_',i),rf,pos = .GlobalEnv)
-#   }
-# })
-# for (i in 1:length(trainSets)){
-#   xte <- xtest[[i]]
-#   xtr <- xtrain[[i]]
-#   yte <- ytest[[i]]
-#   ytr <- ytrain[[i]]
-#   rf <- lapply(param,function(p){
-#     mtry <- p[1,1]
-#     nodesize <- p[1,2]
-#     if (p[1,3] == 0){maxnodes <- NULL}
-#     else{maxnodes <- p[1,3]}
-#     
-#     res <- randomForest::randomForest(x = xtrain[[i]],y = ytrain[[i]],
-#                                       xtest = xtest[[i]],ytest = ytest[[i]],
-#                                       mtry = mtry,nodesize = nodesize,maxnodes = maxnodes,
-#                                       keep.forest = TRUE)
-#     
-#   })
-#   assign(paste0('rf_',i),rf,pos = .GlobalEnv)
-# }
-# 
-# 
-# 
-# system.time({
-# for (i in 1:nrow(param)){
-#   mtry <- param[i,1]
-#   nodesize <- param[i,2]
-#   if (param[i,3] == 0){maxnodes <- NULL}
-#   else{maxnodes <- param[i,3]}
-# 
-#   rf <- lapply(trainSets,function(trainSet){
-#     xtest <- data[-trainSet,-c(1,11)]
-#     xtrain <- data[trainSet,-c(1,11)]
-#     ytest <- data[-trainSet,11]
-#     ytrain <- data[trainSet,11]
-# 
-#     res <- randomForest::randomForest(x = ,y = ytrain,xtest = xtest,ytest = ytest,
-#                                       mtry = mtry,nodesize = nodesize,maxnodes = maxnodes,
-#                                       keep.forest = TRUE,ntree = 100)
-# 
-#   })
-#   assign(paste0('rf_',i),rf,pos = .GlobalEnv)
-# }
-# })
-# trainSets <- caret::groupKFold(group = data$country,k = 15)
-# rf <- lapply(trainSets,function(trainSet){
-#   test <- data[-trainSet,]
-#   train <- data[trainSet,]
-#   res <- randomForest::randomForest(x = train[,-c(1,ncol(train))],y = train[,ncol(train)],
-#                                     ntree = 10,keep.forest = TRUE)
-#   return(res)
-#   
-# }) 
-############################################################
 #Gathering prediction results
+
 cvPredByParam <- lapply(rf,function(pSet){
-  dataTemp <- as.data.frame(matrix(rep(0,nrow(data)*(length(rf))),ncol = length(rf)))
+  samples <- vector('list',length(RFdata))
+  predicted <- vector('list',length(RFdata))
+  real <- vector('list',length(RFdata))
   for (i in 1:length(RFdata)){
-    samples <- RFdata[[i]][[2]]
-    predicted <- pSet[[i]][['test']][['predicted']]
-    temp <- rep(NA,nrow(data))
-    temp[samples] <- predicted
-    dataTemp[,i] <- temp
+    samples[[i]] <- RFdata[[i]][[2]]
+    predicted[[i]] <- pSet[[i]][['test']][['predicted']]
+    real[[i]] <- RFdata[[i]][[5]]
+
   }
-  colnames(dataTemp) <- names(RFdata)
+  samples <- unlist(samples)
+  predicted <- unlist(predicted)
+  real <- unlist(real)
+  dataTemp <- data.frame(samples,predicted,real)
+  dataTemp <- dataTemp[order(dataTemp[,1],dataTemp[,2]),]
   return(dataTemp)
 })
-names(cvPredByParam) <- paste0('p_set_',1:length(rf))
-#Calculating means
-meanRes <- rowMeans(cvPredByParam[[27]],na.rm = TRUE)
-plot(data$copdDalys,meanRes)
-cor(data$copdDalys,meanRes)
-###########################################################"
-# cvPredByParam <- vector('list',length = length(param))
-# samples <- 1:nrow(data)
-# predictionDf <- data.frame(data[,ncol(data)],row.names = samples)
-# for (i in 1:length(cvPredByParam)){
-#  for (ii in 1:length(testSets)){
-#     testSamples <- testSets[[ii]]
-#     predicted <- eval(parse(text = paste0("rf_",ii)))[[i]][['test']][['predicted']]
-#     temp <- data.frame(predicted,row.names = testSamples)
-#     if (ii ==1){
-#       temp2 <- temp
-#     }else{
-#       temp2 <- merge.data.frame(temp2,temp,by = 0,all = TRUE)
-#       row.names(temp2) <- temp2$Row.names
-#       temp2 <- temp2[,-1]
-#       colnames(temp2) <- 1:ncol(temp2)
-#     }
-#     
-#   }
-#   temp3 <-  merge.data.frame(predictionDf,temp2,by = 0,all = TRUE)
-#   row.names(temp3) <- temp3$Row.names
-#   temp3 <- temp3[,-1]
-#   colnames(temp3) <- c('copd',paste0("pred_Fold_",seq(length(testSets))))
-#   cvPredByParam[[i]] <- temp3
-# }
-# m <- rowMeans(cvPredByParam[[1]][,-1],na.rm = TRUE)
-# s <- apply(cvPredByParam[[1]][,-1],1,sd,na.rm = TRUE)
-# plotData <- data.frame(cvPredByParam[[1]][,1],m,s)
-#                        
+
+#Saving results and data to temporary location to keep it safe
+save(data,file = "results_temp/data.RData")
+save(cvPredByParam, file = "results_temp/cvPredByParam.RData")
+save(mainTest,file = "results_temp/mainTest.RData")
+save(allData,file = "results_temp/allData.RData")
+save(RFdata,file = "results_temp/RFdata.RData")
+save(param,file = "results_temp/param.RData")
+
+
+#---------------------#
+#   Result analysis   #
+#---------------------#
+files <- dir(path = "results_temp/")
+for(f in files){
+  load(file = paste0("results_temp/",f),envir = .GlobalEnv)
+}
+#Getting mean prediction
+meanPredByParam <- sapply(cvPredByParam,function(cv){
+  pred <- rep(NA,nrow(data))
+  for (i in 1:nrow(data)){
+    m <- mean(cv[cv[,1] == i,2])
+    pred[i] <- m
+  }
+  return(pred)
+})
+plotData1 <- data.frame(1:nrow(data),data$copdDalys,meanPredByParam)
+setNames <- paste0("P",1:27)
+colnames(plotData1) <- c("sample","real",setNames)
+plotData1 <- tidyr::pivot_longer(plotData1,cols = 3:29,names_to = "Parameter_set")
+colnames(plotData1)[4] <- "Predicted"
+
+squaredE <- (plotData1$real - plotData1$Predicted)^2
+plotData1[,5] <- squaredE
+plotData1[,6] <- 1:nrow(plotData1)
+plotData1[,7] <- data[plotData1$sample,1]
+colnames(plotData1)[5:7] <- c("SE","index","country")
+
+
+ggplot(plotData1,aes(country,SE))+
+  geom_point()+
+  theme(axis.text.x = element_text(angle = 90))
+ggsave("figures/point_country_SE.jpeg")  
+
+#Mean by param
+wideData <- pivot_wider(plotData1,names_from = 3,values_from = 5)
+MSE <- colMeans(wideData[,-c(1:5)],na.rm = TRUE)
+plotData2 <- data.frame(setNames,MSE)
+plotData2$setNames <- factor(plotData2$setNames,levels = setNames)
+ggplot(plotData2,aes(setNames,MSE)) +
+  geom_point() +
+  xlab("Parameter set")
+ggsave("figures/point_param_mse.jpeg")
+#Param set 1 seems good
+set.seed(2021)
+rf2 <- randomForest(x = data[,-c(1,11)],y = data[,11],mtry = param[1,1],nodesize = param[1,2],ntree = 1500,
+                    xtest = mainTest[,-c(1,11)],ytest = mainTest[,11])
+res <- data.frame(rownames(mainTest),mainTest$country,rf2[['test']][['predicted']],mainTest$copdDalys)
+res[,5] <- (res[,4] - res[,3])^2
+colnames(res) <- c('sample','country','predicted','real','SE')
+
+ggplot(res,aes(real,SE,color = country))+
+  geom_point()
+ggsave("figures/point_country_SE.jpeg")
+
+#aggregating test and train(param 1)
+
+aggRes <- rbind(res[,c(1,2,5,4)],plotData[plotData1$Parameter_set == "P1", c(1,7,5,2)])
+aggRes[,5] <- c(rep("Test",sum(aggRes$country == "Poland" | aggRes$country == "Netherlands")),
+                rep("Train",sum(aggRes$country != "Poland" & aggRes$country != "Netherlands")))
+aggRes[,6] <- sqrt(aggRes$SE) 
+colnames(aggRes)[c(5,6)] <- c("Group","absE")
+
+ggplot(aggRes, aes(country,SE,color = Group))+
+  geom_point()+
+  theme(axis.text.x = element_text(angle = 90))
+ggsave("figures/point_country_SE_test-train.jpeg")
+ggplot(aggRes[aggRes$country != "Russian Federation",], aes(country,SE,color = Group))+
+  geom_point()+
+  theme(axis.text.x = element_text(angle = 90))
+ggsave("figures/NO_RU_point_country_SE_test-train.jpeg")
+ggplot(aggRes, aes(real,SE,color = Group))+
+  geom_point(alpha = 1,shape = 1)+
+  facet_grid(cols = vars(Group))
+ggsave("figures/point_real_SE_test-train.jpeg")
+
+ggplot(aggRes,aes(real,absE,color = Group))+
+  geom_point(shape = 1)+
+  facet_grid(cols = vars(Group))
+
+aggResLim <- aggRes[aggRes$country == "Poland" | aggRes$country == "Netherlands" |
+  aggRes$country == "Belgium" | aggRes$country == "Czechia" | aggRes$country == "Germany",]
+ggplot(aggResLim, aes(country,SE,color = Group))+
+  geom_boxplot()
+ggsave("figures/boxplot_country_SE_test-train-lim.jpeg")  
+
+#what about outliers?
+out <- read.csv("outlying_data.csv", row.names = 1)
+set.seed(2021)
+rf3 <- randomForest(x = data[,-c(1,11)],y = data[,11],mtry = param[1,1],nodesize = param[1,2],ntree = 1500,
+                           xtest = out[,-c(1,11)],ytest = out[,11])
+res2 <- data.frame(rownames(out),out$country,rf3[['test']][['predicted']],out$copdDalys)
+res2[,5] <- (res2[,4] - res2[,3])^2
+colnames(res2) <- colnames(res)
+plotData <- rbind(res,res2)
+plotData[,6] <- c(rep("test",nrow(res)),rep("outliers",nrow(res2)))
+colnames(plotData)[6] <- "Group"
+ggplot(plotData,aes(Group,SE))+
+  geom_boxplot()
+ggsave("figures/outlier_res.jpeg")
