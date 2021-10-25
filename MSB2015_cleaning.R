@@ -387,7 +387,7 @@ write.csv(DataY_YminusOne,file = "Data_Y_Y_minus_One.csv",quote = FALSE)
 urf <- isolation.forest(DataY_YminusOne[,-c(1,2)],output_score = TRUE)
 plot(urf[['scores']])
 out <- urf[['scores']]
-plot(out)
+plot(out,ylab = "URF score")
 names(out) <- 1:length(out)
 topOut <- names(sort(out,decreasing = TRUE)[1:15])
 outlying <- rep(FALSE,length(out))
