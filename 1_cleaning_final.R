@@ -94,7 +94,10 @@ plotData <- data.frame(names(datasets),naPerDataset)
 colnames(plotData) <- c("Dataset","NA_proportion")
 ggplot(plotData, aes(Dataset,NA_proportion))+
   geom_point() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.4, hjust=1))
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.4, hjust=1))+
+  xlab("dataset")+
+  ylab("NA(%)")
+ggsave("figures/point_data_na.jpeg")
 
 #Checking missing values per country
 enoughDataCountries <- vector("list",16)
