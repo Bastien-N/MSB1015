@@ -5,18 +5,22 @@
 #   27-10-2021        #
 #=====================#
 
+#-----------------------------#
+#   Manually set parameters   #
+#-----------------------------#
+allPackagesUpdate <- FALSE
 #-----------------------#
 #   Loading libraries   #
 #-----------------------#
 packages <- c("ggplot2","tidyr","pcaMethods","ggfortify","isotree")
 if (!requireNamespace("BiocManager", quietly = TRUE)){
   install.packages("BiocManager")
-  BiocManager::install(version = "3.13") 
+  BiocManager::install(version = "3.13",) 
 }
 
 for (p in packages){
   if (!require(p, character.only = TRUE)){
-    BiocManager::install(p,update = FALSE)
+    BiocManager::install(p,update = allPackagesUpdate)
     if(!require(p,character.only = TRUE)) {stop("Package not found")}
   }
 }

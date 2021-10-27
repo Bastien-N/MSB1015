@@ -10,13 +10,14 @@
 #----------------#
 #   User input   #
 #----------------#
-#dat <- "data_change.csv"
 dat <- "noOutData_Y_Y_minus_One.csv" #Which version of the cleaned dataset to be used
 nRun <- 20 #Number of separate runs
+allPackagesUpdate <- FALSE #Should all package dependencies be updated?
+skipCVloop <- TRUE #Should the CV loop be skipped?
 #-----------------------#
 #   Loading libraries   #
 #-----------------------#
-packages <- c("ggplot2","randomForest","caret","dplyr","tidyr","parallel")
+packages <- c("ggplot2","randomForest","caret","dplyr","tidyr","parallel","DESeq2")
 if (!requireNamespace("BiocManager", quietly = TRUE)){
   install.packages("BiocManager")
   BiocManager::install(version = "3.13") 
@@ -24,11 +25,11 @@ if (!requireNamespace("BiocManager", quietly = TRUE)){
 
 for (p in packages){
   if (!require(p, character.only = TRUE)){
-    BiocManager::install(p,update = FALSE)
+    BiocManager::install(p,update = allPackagesUpdate)
     if(!require(p,character.only = TRUE)) {stop("Package not found")}
   }
 }
-
+#Note, may return an error saying a package was not loaded even though it actually was loaded
 #------------------#
 #   Loading data   #
 #------------------#
@@ -109,68 +110,68 @@ RFdata <- lapply(trainSets,function(trainSet){
 #-----------------------------------------------------------------------#
 #   Random forest Cross-validation (every parameter set for all runs)   #
 #-----------------------------------------------------------------------#
-# ! Can take several hours, skip to line 178 if you wish to avoid that
-system.time({ 
-  coreNum <- parallel::detectCores()
-  clust <- parallel::makeCluster(coreNum-1)
-  rf <- vector('list',nrow(param))
-  for (i in 1:nrow(param)){
-    print(paste0("Running over parameter set ",i,"..."))
-    mtry <- as.numeric(param[i,1])
-    nodesize <- as.numeric(param[i,2])
-    if (param[i,3] == 0){maxnodes <- NULL}
-    else{maxnodes <- param[i,3]}
-    
-    
-    clusterExport(cl = clust,varlist = c("mtry","nodesize","maxnodes"))
-    rf[[i]] <- parLapply(cl = clust,RFdata,function(fold){
+if (skipCVloop == FALSE){
+  system.time({ 
+    coreNum <- parallel::detectCores()
+    clust <- parallel::makeCluster(coreNum-1)
+    rf <- vector('list',nrow(param))
+    for (i in 1:nrow(param)){
+      print(paste0("Running over parameter set ",i,"..."))
+      mtry <- as.numeric(param[i,1])
+      nodesize <- as.numeric(param[i,2])
+      if (param[i,3] == 0){maxnodes <- NULL}
+      else{maxnodes <- param[i,3]}
       
-      xtest <- fold[[3]]
-      xtrain <- fold[[4]]
-      ytest <- fold[[5]]
-      ytrain <- fold[[6]]
       
-      res <- randomForest::randomForest(x = xtrain,y = ytrain,
-                                        xtest = xtest,ytest = ytest,
-                                        mtry = mtry,nodesize = nodesize,maxnodes = maxnodes,
-                                        keep.forest = FALSE,ntree = 1500)
-      return(res)  
-    })
-    print(paste0("Running over parameter set ",i,"...","DONE"))
-    #assign(paste0('rf_',i),rf,pos = .GlobalEnv)
-  }
-  stopCluster(cl = clust)
-})
-
-#Gathering prediction results
-
-cvPredByParam <- lapply(rf,function(pSet){
-  samples <- vector('list',length(RFdata))
-  predicted <- vector('list',length(RFdata))
-  real <- vector('list',length(RFdata))
-  for (i in 1:length(RFdata)){
-    samples[[i]] <- RFdata[[i]][[2]]
-    predicted[[i]] <- pSet[[i]][['test']][['predicted']]
-    real[[i]] <- RFdata[[i]][[5]]
-
-  }
-  samples <- unlist(samples)
-  predicted <- unlist(predicted)
-  real <- unlist(real)
-  dataTemp <- data.frame(samples,predicted,real)
-  dataTemp <- dataTemp[order(dataTemp[,1],dataTemp[,2]),]
-  return(dataTemp)
-})
-
-#Saving results and data to temporary location to keep it safe
-#and avoid having to re-run the long analysis
-save(data,file = "results_temp/data.RData")
-save(cvPredByParam, file = "results_temp/cvPredByParam.RData")
-save(mainTest,file = "results_temp/mainTest.RData")
-save(allData,file = "results_temp/allData.RData")
-save(RFdata,file = "results_temp/RFdata.RData")
-save(param,file = "results_temp/param.RData")
-
+      clusterExport(cl = clust,varlist = c("mtry","nodesize","maxnodes"))
+      rf[[i]] <- parLapply(cl = clust,RFdata,function(fold){
+        
+        xtest <- fold[[3]]
+        xtrain <- fold[[4]]
+        ytest <- fold[[5]]
+        ytrain <- fold[[6]]
+        
+        res <- randomForest::randomForest(x = xtrain,y = ytrain,
+                                          xtest = xtest,ytest = ytest,
+                                          mtry = mtry,nodesize = nodesize,maxnodes = maxnodes,
+                                          keep.forest = FALSE,ntree = 1500)
+        return(res)  
+      })
+      print(paste0("Running over parameter set ",i,"...","DONE"))
+      #assign(paste0('rf_',i),rf,pos = .GlobalEnv)
+    }
+    stopCluster(cl = clust)
+  })
+  
+  #Gathering prediction results
+  
+  cvPredByParam <- lapply(rf,function(pSet){
+    samples <- vector('list',length(RFdata))
+    predicted <- vector('list',length(RFdata))
+    real <- vector('list',length(RFdata))
+    for (i in 1:length(RFdata)){
+      samples[[i]] <- RFdata[[i]][[2]]
+      predicted[[i]] <- pSet[[i]][['test']][['predicted']]
+      real[[i]] <- RFdata[[i]][[5]]
+  
+    }
+    samples <- unlist(samples)
+    predicted <- unlist(predicted)
+    real <- unlist(real)
+    dataTemp <- data.frame(samples,predicted,real)
+    dataTemp <- dataTemp[order(dataTemp[,1],dataTemp[,2]),]
+    return(dataTemp)
+  })
+  
+  #Saving results and data to temporary location to keep it safe
+  #and avoid having to re-run the long analysis
+  save(data,file = "results_temp/data.RData")
+  save(cvPredByParam, file = "results_temp/cvPredByParam.RData")
+  save(mainTest,file = "results_temp/mainTest.RData")
+  save(allData,file = "results_temp/allData.RData")
+  save(RFdata,file = "results_temp/RFdata.RData")
+  save(param,file = "results_temp/param.RData")
+}
 
 #---------------------------------------#
 #   Cross validation results analysis   #
