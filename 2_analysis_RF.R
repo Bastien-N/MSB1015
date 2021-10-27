@@ -109,6 +109,7 @@ RFdata <- lapply(trainSets,function(trainSet){
 #-----------------------------------------------------------------------#
 #   Random forest Cross-validation (every parameter set for all runs)   #
 #-----------------------------------------------------------------------#
+# ! Can take several hours, skip to line 178 if you wish to avoid that
 system.time({ 
   coreNum <- parallel::detectCores()
   clust <- parallel::makeCluster(coreNum-1)
