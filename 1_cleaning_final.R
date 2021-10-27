@@ -1,7 +1,9 @@
-
-#----------------#
-#   User input   #
-#----------------#
+#=====================#
+#   Bastien Nihant    #
+#   MSB1015 project   #
+#   Script 1/2        #
+#   27-10-2021        #
+#=====================#
 
 #-----------------------#
 #   Loading libraries   #
@@ -18,6 +20,7 @@ for (p in packages){
     if(!require(p,character.only = TRUE)) {stop("Package not found")}
   }
 }
+
 
 #------------------------#
 #   Defining functions   #
@@ -36,6 +39,7 @@ gbd_extract <- function(dat,measure,numType,disease,countries,years){
   return(dat2)
 }
 
+
 #--------------------#
 #   Importing data   #
 #--------------------#
@@ -48,15 +52,18 @@ for (d in 1:length(datasets)){
   datasets[[d]] <- read.csv(file = paste0(getwd(),"/data/",files[d]),header = TRUE,na.strings = c("...",""))
 }
 
+#-------------------------------#
+#   Missing values management   #
+#-------------------------------#
 
-#checking missing values per measure
+#checking missing values per columns for every measure
 for (i in 1:length(datasets)){
   naMatrix <- as.matrix(is.na.data.frame(datasets[[i]]))
   naProp <- colSums(naMatrix)/nrow(naMatrix)
   plot(naProp,main = names(datasets)[i])
 }
 
-#Cutting of "useless" data
+#Cutting of "useless" columns
 for (i in c(1,2,5,13,14,16)){ #For GH gases
   datasets[[i]] <- datasets[[i]][-1,-c(1,32:35)]
   colnames(datasets[[i]]) <- c("country",1990:2018)
@@ -68,12 +75,26 @@ for (i in c(6:11,14,16)){
   datasets[[i]] <- datasets[[i]][,-c(1,index2017+1 : ncol(datasets[[i]]))]
 }
 
-#checking missing values per measure
+#checking missing values per columns for every measure
 for (i in 1:length(datasets)){
   naMatrix <- as.matrix(is.na.data.frame(datasets[[i]]))
   naProp <- colSums(naMatrix)/nrow(naMatrix)
   plot(naProp,main = names(datasets)[i])
 }
+
+#Checking total missing values per measures
+naPerDataset <- sapply(datasets, function(d){
+  naMatrix <- as.matrix(is.na.data.frame(d))
+  nCell <- ncol(naMatrix)*nrow(naMatrix)
+  naTot <- sum(colSums(naMatrix))
+  naProp <- naTot / nCell
+  return(naProp)
+})
+plotData <- data.frame(names(datasets),naPerDataset)
+colnames(plotData) <- c("Dataset","NA_proportion")
+ggplot(plotData, aes(Dataset,NA_proportion))+
+  geom_point() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.4, hjust=1))
 
 #Checking missing values per country
 enoughDataCountries <- vector("list",16)
@@ -86,15 +107,17 @@ for (i in 1:16){
   enoughDataCountries[[i]] <- datasets[[i]][Na30p < 0.3,1]
 }
 commonCountries <- Reduce(intersect,enoughDataCountries)
-
-# Removing hazardous waste from calculation
+print(commonCountries)
+# Removing hazardous waste from calculation due to NA values
 enoughDataCountriesNoWaste <- enoughDataCountries[c(1:3,5,12:15)]
 commonCountriesNoWaste <- Reduce(intersect,enoughDataCountriesNoWaste) #Better than when keeping waste
+print(commonCountriesNoWaste)
 
-
-#selection of datasets
+# Selection of datasets
+# Waste data is removed (too many NAs)
+# Removing forest for having the wrong format
 datasets <- datasets[c(1:3,5,12:15,17)]
-#Cutting year 2018 from datasets
+#Cutting year 2018 from datasets which have it, as the "Renewable" dataset does not cover it
 for (i in c(1:6,8)){
   datasets[[i]] <- datasets[[i]][,-c(30)]
 }
@@ -110,7 +133,7 @@ for (i in 1:8){
   enoughDataCountries[[i]] <- datasets[[i]][Na30p < 0.3,1]
 }
 commonCountries <- Reduce(intersect,enoughDataCountries)
-
+print(commonCountries)
 
 #Removing unusable countries and cleaning variable names and 
 #data type for the environment data, reorganizing data
@@ -127,6 +150,10 @@ datasetsClean <- lapply(datasets[-9], function(x){
   return(dat)
 })
 
+#--------------------------------------------------------------#
+#   Getting GBD data and adding it to the rest, removing Nas   #
+#--------------------------------------------------------------#
+
 #extracting needed GBD data
 copdDailys <- gbd_extract(datasets[[9]],"DALYs (Disability-Adjusted Life Years)",
                           "Number","Chronic obstructive pulmonary disease",
@@ -141,24 +168,23 @@ Data <- data.frame(datasetsClean[[1]],datasetsClean[[2]][,3],
                    datasetsClean[[9]][,3])
 colnames(Data)[-c(1,2)] <- names(datasetsClean)
 
-
-# #check countries with too many missing values over too many variables
-# rowWiseNa <- apply(naDat[,-c(1,2)],1,sum)
-# missingDataCountries <- unique(naDat[(rowWiseNa / 9) > 0.3,1])
-# Data <- Data[!(Data$country %in% missingDataCountries),]
-
 #Removing all rows with missing values
 naDat <- is.na.data.frame(Data)
 naDat <- rowSums(naDat) == 0
-
 Data <- Data[naDat,]
-pcaDat <- Data[,-c(1,2)]
-pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
-substring <- substr(Data$country,1,2)
-pcaRes <- data.frame(Data[,c(1,2)],pcaDat@scores,substring)
+#---------------------------------------------#
+#   Examining data distribution through PCA   #
+#              Transforming data              #
+#---------------------------------------------#
 
-ggplot(pcaRes,aes(x = PC1,y = PC2,color = year)) +
-  geom_text(aes(label = substring)) 
+pcaDat <- Data[,-c(1,2)]
+pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
+substring <- substr(Data$country,1,2)
+pcaRes <- data.frame(Data, pcaDat$x,substring)
+ggplot(pcaRes,aes(PC1,PC2,color = copdDalys))+
+  geom_point()
+################################
+# stopped at line 162 of old cleaning file
 #Transforming data into change (year-previous year)
 countries <- unique(Data$country)
 
@@ -177,17 +203,8 @@ for (i in 1:length(countries)){
     DataChange <- rbind(DataChange,dataTemp3)
   }
 }
-# pcaDat <- DataChange[,-c(1,2)]
-# pcaDat <- pca(pcaDat,nPcs = 6,scale = "pareto")
-# substring <- substr(DataChange$country,1,2)
-# pcaRes <- data.frame(DataChange,pcaDat@scores, substring)
-# plot(pcaDat@loadings)
-# ggplot(pcaRes,aes(x = PC1,y = PC2,color = copdDalys)) +
-#   geom_text(aes(label = substring)) +
-#   geom_segment(data=pcaD, aes(x=0, y=0, xend=PC1, yend=PC2)
-#                , arrow=arrow(length=unit(0.2,"cm")), alpha=0.25)
-# ggbiplot(as.data.frame(pcaDat@scores),as.data.frame(pcaDat@loadings))
 
+# Examining Change data in PCA
 pcaDat <- DataChange[,-c(1,2)]
 pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
 substring <- substr(DataChange$country,1,2)
@@ -195,175 +212,7 @@ pcaRes <- data.frame(DataChange, substring)
 autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
          label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
 
-######################################"
-
-####################################""
-# #Removing samples with the two smallest PC1
-# PC1 <- pcaDat$x[,'PC1']
-# smallestTwo <- sort(PC1)[c(1,2)]
-# DataChangeTemp <- data.frame(DataChange,PC1 %in% smallestTwo)
-# colnames(DataChangeTemp)[12] <- 'Outlier'
-# ggplot(DataChangeTemp[DataChangeTemp$country=="Russian Federation",],
-#        aes(year,GHG,colour = Outlier))+
-#   geom_point()+
-#   theme(axis.text.x = element_text(angle = 90))
-# 
-# DataChange <- DataChange[!(PC1 %in% smallestTwo),]
-# 
-# 
-# pcaDat <- DataChange[,-c(1,2)]
-# pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
-# substring <- substr(DataChange$country,1,2)
-# pcaRes <- data.frame(DataChange, substring)
-# autoplot(pcaDat,x = 1,y = 2,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
-#          label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
-# 
-# 
-# #Removing samples with the two largest PC1
-# PC1 <- pcaDat$x[,'PC1']
-# largestTwo <- sort(PC1, decreasing = TRUE)[c(1,2)]
-# DataChangeTemp <- data.frame(DataChange,PC1 %in% largestTwo)
-# colnames(DataChangeTemp)[12] <- 'Outlier'
-# ggplot(DataChangeTemp[DataChangeTemp$country=="Russian Federation",],
-#        aes(year,CO2,colour = Outlier))+
-#   geom_point()+
-#   theme(axis.text.x = element_text(angle = 90))
-
-#DataChange <- DataChange[!(PC1 %in% largestTwo),]
-
-
-
-# 
-# #min-max Scaling
-# DataChange[,-c(1,2)] <- apply(DataChange[,-c(1,2)],2,function(x){
-#    (x - min(x))/(max(x)-min(x))
-# })
-# 
-# pcaDat <- DataChange[,-c(1,2)]
-# pcaDat <- pca(pcaDat,nPcs = 6,scale = "none")
-# substring <- substr(DataChange$country,1,2)
-# pcaRes <- data.frame(DataChange[,c(1,2)],pcaDat@scores,substring)
-# 
-# ggplot(pcaRes,aes(x = PC1,y = PC2,color = country)) +
-#   geom_text(aes(label = substring)) 
-# #Exploring relationship
-# for (var in colnames(DataChange)[-c(1,2,11)]){
-#   plot(DataChange[,var],DataChange$copdDalys,xlab = var,ylab = "COPD Dalys")
-# }
-# 
-# #creating shifted data
-# dataShifted <- vector(mode = "list",5)
-# shifts <- 1:5
-# for (i in 1:length(shifts)){
-#   for (ii in 1:length(countries)){
-#     dataTemp <- DataChange[DataChange$country == countries[ii],]
-#     predTemp <- dataTemp[-((nrow(dataTemp)-shifts[i]+1):nrow(dataTemp)),-ncol(dataTemp)]
-#     critTemp <- dataTemp[-(1:shifts[i]),ncol(dataTemp)]
-#     dataTemp <- data.frame(predTemp,critTemp)
-#     if (ii == 1){
-#       dataTemp2 <- dataTemp
-#     }
-#     else{
-#       dataTemp2 <- rbind(dataTemp2,dataTemp)
-#     }
-#   }
-#   dataShifted[[i]] <- dataTemp2
-#   names(dataShifted)[i] <- paste0("YearMinus",shifts[i])
-#   colnames(dataShifted[[i]])[11] <- "copdDalys"
-# }
-# for (var in colnames(dataShifted[[i]])[-c(1,2,11)]){
-#   for (i in 1:length(dataShifted)){
-#   
-#     plot(dataShifted[[i]][,var],dataShifted[[i]]$copdDalys,
-#          main = names(dataShifted)[i],xlab = var,ylab = "COPD Dalys")
-#   }
-# }
-# 
-# ##Aggregating years:
-# #Per three years
-# dataTemp <- dataTemp2 <- dataTemp3 <- DataAggThree<- NULL
-# for (i in 1:length(countries)){
-#   
-#   dataTemp <- DataChange[DataChange$country == countries[i],]
-#   years <- unique(dataTemp$year)
-#   for (ii in 1:9){
-#     yearsTemp <- years[(1+(ii-1)*3):(ii*3)]
-#     dataTemp2 <- dataTemp[dataTemp$year %in% yearsTemp,]
-#     
-#     if (nrow(dataTemp2) == 3){
-# 
-#       dataTemp2 <- data.frame(dataTemp2[1,1],
-#                               paste0(substr(yearsTemp[1],1,4),'_to_',substr(yearsTemp[3],1,4)),
-#                                      t(colSums(dataTemp2[,-c(1,2)])))
-#       colnames(dataTemp2) <- colnames(DataChange)
-#       if (ii == 1){
-#         dataTemp3 <- dataTemp2
-#       }
-#       else{
-#         dataTemp3 <- rbind(dataTemp3,dataTemp2)
-#       }
-#     }
-# 
-#   }
-#   if (i == 1){DataAggThree <- dataTemp3}
-#   else{DataAggThree <- rbind(DataAggThree,dataTemp3)}
-# }
-# 
-# #PCA
-# pcaDat <- DataAggThree[,-c(1,2)]
-# pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
-# substring <- substr(DataAggThree$country,1,2)
-# pcaRes <- data.frame(DataAggThree, substring)
-# autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
-#          label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
-# #Exploring relationship
-# for (var in colnames(DataAggThree)[-c(1,2,11)]){
-#   plot(DataAggThree[,var],DataAggThree$copdDalys,xlab = var,ylab = "COPD Dalys")
-# }
-# ##Aggregating years:
-# #Per nine years
-# dataTemp <- dataTemp2 <- dataTemp3 <- DataAggNine<- NULL
-# for (i in 1:length(countries)){
-#   
-#   dataTemp <- DataChange[DataChange$country == countries[i],]
-#   years <- unique(dataTemp$year)
-#   for (ii in 1:3){
-#     yearsTemp <- years[(1+(ii-1)*9):(ii*9)]
-#     dataTemp2 <- dataTemp[dataTemp$year %in% yearsTemp,]
-#     
-#     if (nrow(dataTemp2) == 9){
-#       
-#       dataTemp2 <- data.frame(dataTemp2[1,1],
-#                               paste0(substr(yearsTemp[1],1,4),'_to_',substr(yearsTemp[3],1,4)),
-#                               t(colSums(dataTemp2[,-c(1,2)])))
-#       colnames(dataTemp2) <- colnames(DataChange)
-#       if (ii == 1){
-#         dataTemp3 <- dataTemp2
-#       }
-#       else{
-#         dataTemp3 <- rbind(dataTemp3,dataTemp2)
-#       }
-#     }
-#     
-#   }
-#   if (i == 1){DataAggNine <- dataTemp3}
-#   else{DataAggNine <- rbind(DataAggNine,dataTemp3)}
-# }
-# 
-# #PCA
-# pcaDat <- DataAggNine[,-c(1,2)]
-# pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
-# substring <- substr(DataAggNine$country,1,2)
-# pcaRes <- data.frame(DataAggNine, substring)
-# autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
-#          label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
-# #Exploring relationship
-# for (var in colnames(DataAggNine)[-c(1,2,11)]){
-#   plot(DataAggNine[,var],DataAggNine$copdDalys,xlab = var,ylab = "COPD Dalys")
-# }
-# 
-
-#Creating complete shifted model Y + Y-1
+#Creating complete model data (Y , Y-1)
 for (i in 1:length(countries)){
   Y <- DataChange[DataChange$country == countries[i],]
   Y <- Y[-1,]
@@ -375,34 +224,43 @@ for (i in 1:length(countries)){
   if (i == 1){DataY_YminusOne <- dataTemp
   }else {DataY_YminusOne <-  rbind(DataY_YminusOne ,dataTemp)}
 }
+# Examining complete model data in PCA
 pcaDat <- DataY_YminusOne[,-c(1,2)]
 pcaDat <- prcomp(pcaDat, scale. = TRUE,center = TRUE)
 substring <- substr(DataY_YminusOne$country,1,2)
 pcaRes <- data.frame(DataY_YminusOne, substring)
 autoplot(pcaDat,data = pcaRes , label = TRUE,shape = FALSE,label.label = 'substring',
          label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE)
+# Saving complete model data
 write.csv(DataY_YminusOne,file = "Data_Y_Y_minus_One.csv",quote = FALSE)
 
-#
+#--------------------------------------------#
+#   Isolation forest  to identify outliers   #
+#--------------------------------------------#
+#Running isolation forest with set seed for reproducability
+set.seed(2021)
 urf <- isolation.forest(DataY_YminusOne[,-c(1,2)],output_score = TRUE)
-plot(urf[['scores']])
+# Extracting outlier score and plotting to examine patterns across data structure
 out <- urf[['scores']]
-plot(out)
+plot(out,ylab = "IF outlier score")
 names(out) <- 1:length(out)
-topOut <- names(sort(out,decreasing = TRUE)[1:15])
+topOut <- names(sort(out,decreasing = TRUE)[1:15]) #Selecting top 15 outliers
 outlying <- rep(FALSE,length(out))
 outlying[as.numeric(topOut)] <- TRUE
+
+#Runningand plotting PCA again with outliers in blue
 pcaResTemp <- data.frame(pcaRes,outlying)
 
 plot <- autoplot(pcaDat,data = pcaResTemp , label = TRUE,shape = FALSE,label.label = 'substring',
-         label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE,label.colour = 'outlying')
+                 label.alpha = 0.6,loadings = TRUE,loadings.label = TRUE,label.colour = 'outlying')
 print(plot)
+
 #Assessing place of outliers in the data
 dataOut <- data.frame(DataY_YminusOne,outlying)
 DataY_YminusOne[outlying,1]
 ggplot(data = dataOut[dataOut$country == "Russian Federation",],aes(x = year,y = copdDalys,color = outlying)) +
-         geom_point()+
-         theme(axis.text.x = element_text(angle = 90))
+  geom_point()+
+  theme(axis.text.x = element_text(angle = 90))
 ggplot(data = dataOut[dataOut$country == "Uzbekistan",],aes(x = year,y = copdDalys,color = outlying)) +
   geom_point()+
   theme(axis.text.x = element_text(angle = 90))
@@ -412,6 +270,5 @@ ggplot(data = dataOut[dataOut$country == "Republic of Moldova",],aes(x = year,y 
 
 #Removing outliers
 noOutDataY_YminusOne <- DataY_YminusOne[!outlying,]
-write.csv(noOutDataY_YminusOne,file = "noOutData_Y_Y_minus_One.csv",quote = FALSE)
-write.csv(DataY_YminusOne[outlying,],file = "outlying_data.csv",quote = FALSE)
-
+write.csv(noOutDataY_YminusOne,file = "noOutData_Y_Y_minus_One.csv",quote = FALSE) #Data without outliers
+write.csv(DataY_YminusOne[outlying,],file = "outlying_data.csv",quote = FALSE) #Data with outliers
