@@ -4,7 +4,7 @@
 #   Script 1/2        #
 #   27-10-2021        #
 #=====================#
-
+#Note, Make sure that your working directory contains the compel Data folder from github
 #-----------------------------#
 #   Manually set parameters   #
 #-----------------------------#
